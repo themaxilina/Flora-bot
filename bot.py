@@ -1,11 +1,19 @@
 
 import logging
 import os
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from datetime import datetime, timedelta
+from telegram import (
+    Update, ReplyKeyboardMarkup, InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ContextTypes, filters
+)
 
 logging.basicConfig(level=logging.INFO)
 
+# Токен
 TOKEN = os.environ.get("BOT_TOKEN")
 
 # Главное меню
@@ -14,68 +22,36 @@ main_menu = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# Кнопки каталога
+# Каталог
 catalog_menu = ReplyKeyboardMarkup(
     [['🌹 Букет 1'], ['🌷 Букет 2'], ['🌻 Букет 3'], ['⬅️ Назад']],
     resize_keyboard=True
 )
 
-# Хранилище для отслеживания состояния пользователя
-user_states = {}  # user_id: { 'stage': 'waiting_for_contact', 'bouquet': '🌹 Букет 1' }
-
-# Команда /start
+# Старт
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Добро пожаловать в Flora Пермь! Выберите действие:",
         reply_markup=main_menu
     )
 
-# Обработка обычных сообщений
+# Обработка сообщений
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user_id = update.message.from_user.id
-
-    # Проверка: если пользователь в режиме ожидания данных
-    if user_id in user_states and user_states[user_id]['stage'] == 'waiting_for_contact':
-        bouquet = user_states[user_id]['bouquet']
-        await update.message.reply_text(
-            f"Спасибо за заказ на {bouquet}!\nВаши данные: {text}\nСкоро с вами свяжемся! 💐"
-        )
-        del user_states[user_id]
-        return
-
     if text == '💐 Каталог':
         await update.message.reply_text("Выберите букет:", reply_markup=catalog_menu)
 
     elif text == '🌹 Букет 1':
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("Заказать 🌹", callback_data="order_1")]])
-        await update.message.reply_photo(
-            photo="https://floraservis.ru/upload/iblock/0d3/nkr6256qhf6b79bdh86ezgl9kufycbei.jpeg",
-            caption="🌹 Букет 1 — 18230₽",
-            reply_markup=keyboard
-        )
+        await send_bouquet(update, "🌹 Букет 1", "18230₽", "https://floraservis.ru/upload/iblock/0d3/nkr6256qhf6b79bdh86ezgl9kufycbei.jpeg", "1")
 
     elif text == '🌷 Букет 2':
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("Заказать 🌷", callback_data="order_2")]])
-        await update.message.reply_photo(
-            photo="https://floraservis.ru/upload/iblock/0fc/abo9003vbqn2fusdjosgknhsxwczpq7j.jpeg",
-            caption="🌷 Букет 2 — 18230₽",
-            reply_markup=keyboard
-        )
+        await send_bouquet(update, "🌷 Букет 2", "18230₽", "https://floraservis.ru/upload/iblock/0fc/abo9003vbqn2fusdjosgknhsxwczpq7j.jpeg", "2")
 
     elif text == '🌻 Букет 3':
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("Заказать 🌻", callback_data="order_3")]])
-        await update.message.reply_photo(
-            photo="https://floraservis.ru/upload/iblock/e25/f2bvr479poaj4h1qp9fx6o41slldkwqt.jpg",
-            caption="🌻 Букет 3 — 32600₽",
-            reply_markup=keyboard
-        )
+        await send_bouquet(update, "🌻 Букет 3", "32600₽", "https://floraservis.ru/upload/iblock/e25/f2bvr479poaj4h1qp9fx6o41slldkwqt.jpg", "3")
 
     elif text == '⬅️ Назад':
         await update.message.reply_text("Вы вернулись в главное меню", reply_markup=main_menu)
-
-    elif text == '🛍 Заказать':
-        await update.message.reply_text("Для заказа выберите букет из каталога")
 
     elif text == '📞 Контакты':
         await update.message.reply_text(
@@ -83,31 +59,81 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     else:
-        await update.message.reply_text("Я пока не понимаю эту команду 😊")
+        # Ожидание имени и телефона
+        if context.user_data.get("waiting_for_contact"):
+            context.user_data["contact_info"] = text
+            await update.message.reply_text("Спасибо за заказ! Мы скоро свяжемся с вами 😊")
 
-# Обработка нажатий на кнопки "Заказать"
+            # Можно сохранить в БД или вывести
+            print("📝 Новый заказ:")
+            print(context.user_data)
+
+            context.user_data.clear()
+        else:
+            await update.message.reply_text("Я пока не понимаю эту команду 😊")
+
+# Показ букета
+async def send_bouquet(update, name, price, photo_url, code):
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(f"Заказать {name}", callback_data=f"order_{code}")]])
+    await update.message.reply_photo(photo=photo_url, caption=f"{name} — {price}", reply_markup=keyboard)
+
+# Обработка кнопки "Заказать букет"
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     bouquet_id = query.data.split("_")[1]
     names = {"1": "🌹 Букет 1", "2": "🌷 Букет 2", "3": "🌻 Букет 3"}
-    bouquet_name = names.get(bouquet_id, "Букет")
+    bouquet = names.get(bouquet_id, "Букет")
 
-    user_id = query.from_user.id
-    user_states[user_id] = {
-        'stage': 'waiting_for_contact',
-        'bouquet': bouquet_name
-    }
+    context.user_data["bouquet"] = bouquet
 
+    # Предложим выбрать дату
+    today = datetime.today()
+    dates = [(today + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(3)]
+
+    keyboard = [
+        [InlineKeyboardButton(date, callback_data=f"date_{date}")] for date in dates
+    ]
     await query.message.reply_text(
-        f"Вы выбрали {bouquet_name}. Пожалуйста, отправьте ваше имя и номер телефона для оформления заказа:"
+        f"Вы выбрали {bouquet}.\nПожалуйста, выберите дату доставки:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# Запуск бота
+# Обработка выбора даты и времени
+async def handle_date_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+
+    if data.startswith("date_"):
+        date = data.replace("date_", "")
+        context.user_data["date"] = date
+
+        times = ["10:00–13:00", "13:00–16:00", "16:00–19:00"]
+        keyboard = [
+            [InlineKeyboardButton(t, callback_data=f"time_{t}")] for t in times
+        ]
+        await query.message.reply_text(
+            f"Вы выбрали дату: {date}. Теперь выберите удобное время:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    elif data.startswith("time_"):
+        time = data.replace("time_", "")
+        context.user_data["time"] = time
+        context.user_data["waiting_for_contact"] = True
+
+        await query.message.reply_text(
+            f"Отлично! Вы выбрали доставку {context.user_data['date']} в {time}.\n\nПожалуйста, отправьте ваше имя и номер телефона:"
+        )
+
+# Запуск
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(handle_callback))
+app.add_handler(CallbackQueryHandler(handle_date_time, pattern="^(date_|time_)"))
+app.add_handler(CallbackQueryHandler(handle_callback, pattern="^order_"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 app.run_polling()
