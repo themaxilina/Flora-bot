@@ -25,9 +25,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == '🛍 Заказать':
         await update.message.reply_text("Для заказа напишите: имя и номер телефона")
     elif text == '📞 Контакты':
-        await update.message.reply_text("📍 Пермь, Цветочная 12
-📞 +7 (342) 123-45-67
-⏰ 9:00–21:00")
+        await update.message.reply_text(
+            "📍 Пермь, Цветочная 12\n📞 +7 (342) 123-45-67\n⏰ 9:00–21:00"
+        )
     else:
         await update.message.reply_text("Я пока не понимаю эту команду 😊")
 
