@@ -2,27 +2,20 @@
 import logging
 import os
 from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
+    Update, ReplyKeyboardMarkup,
+    InlineKeyboardMarkup, InlineKeyboardButton
 )
 from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters,
+    ApplicationBuilder, CommandHandler,
+    MessageHandler, CallbackQueryHandler,
+    ContextTypes, filters
 )
+from datetime import datetime, timedelta
 
-# Логгирование
 logging.basicConfig(level=logging.INFO)
 
-# Токен бота из переменной окружения
 TOKEN = os.environ.get("BOT_TOKEN")
 
-# Меню
 main_menu = ReplyKeyboardMarkup(
     [['💐 Каталог', '🛍 Заказать'], ['📞 Контакты']],
     resize_keyboard=True
@@ -33,12 +26,21 @@ catalog_menu = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# Состояния
-user_data = {}
-availability = {"1": 0, "2": 2, "3": 10}
+# Хранение состояния пользователя
+user_state = {}
 
-date_options = ["24 апреля 2025", "25 апреля 2025", "26 апреля 2025"]
-time_slots = ["с 9:00 до 12:00", "с 12:00 до 15:00", "с 15:00 до 18:00"]
+# Остатки
+stock = {
+    "1": 0,  # Нет в наличии
+    "2": 2,  # 2 штуки
+    "3": 999  # Много
+}
+
+# Формируем 3 ближайших даты
+def get_delivery_dates():
+    return [(datetime.now() + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(1, 4)]
+
+time_slots = ['10:00–12:00', '12:00–15:00', '15:00–18:00']
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -47,131 +49,128 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu
     )
 
-# Обработка текстовых сообщений
+# Каталог
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user_id = update.message.from_user.id
+    chat_id = update.message.chat_id
 
-    # Если пользователь на этапе ввода имени и телефона
-    if user_id in user_data and user_data[user_id].get("waiting_for") == "name_phone":
-        user_data[user_id]["name_phone"] = text
-        bouquet = user_data[user_id]["bouquet"]
-        date = user_data[user_id]["date"]
-        time = user_data[user_id]["time"]
-        name_phone = user_data[user_id]["name_phone"]
-
-        await update.message.reply_text(
-            f"Спасибо за заказ!\n\n"
-            f"Букет: {bouquet}\n"
-            f"Дата доставки: {date}\n"
-            f"Время: {time}\n"
-            f"Имя и телефон: {name_phone}"
-        )
-        del user_data[user_id]
-        return
-
-    # Обычная логика
     if text == '💐 Каталог':
         await update.message.reply_text("Выберите букет:", reply_markup=catalog_menu)
 
+    elif text == '🌹 Букет 1':
+        await update.message.reply_photo(
+            photo="https://floraservis.ru/upload/iblock/0d3/nkr6256qhf6b79bdh86ezgl9kufycbei.jpeg",
+            caption="🌹 Букет 1 — 18230₽\n\n❌ Временно нет в наличии."
+        )
+
+    elif text == '🌷 Букет 2':
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Заказать 🌷", callback_data="order_2")]
+        ])
+        await update.message.reply_photo(
+            photo="https://floraservis.ru/upload/iblock/0fc/abo9003vbqn2fusdjosgknhsxwczpq7j.jpeg",
+            caption=f"🌷 Букет 2 — 18230₽\n\nОсталось: {stock['2']} шт.",
+            reply_markup=keyboard
+        )
+
+    elif text == '🌻 Букет 3':
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Заказать 🌻", callback_data="order_3")]
+        ])
+        await update.message.reply_photo(
+            photo="https://floraservis.ru/upload/iblock/e25/f2bvr479poaj4h1qp9fx6o41slldkwqt.jpg",
+            caption="🌻 Букет 3 — 32600₽",
+            reply_markup=keyboard
+        )
+
     elif text == '⬅️ Назад':
         await update.message.reply_text("Вы вернулись в главное меню", reply_markup=main_menu)
+
+    elif text == '🛍 Заказать':
+        await update.message.reply_text(
+            "Чтобы оформить заказ:\n"
+            "1. Перейдите в 💐 Каталог\n"
+            "2. Выберите букет\n"
+            "3. Нажмите кнопку 'Заказать' под ним"
+        )
 
     elif text == '📞 Контакты':
         await update.message.reply_text(
             "📍 Пермь, Карпинского 91д\n📞 +7 (342) 214-88-99\n⏰ 9:00–21:00"
         )
 
-    elif text == '🛍 Заказать':
-        await update.message.reply_text("Выберите букет в Каталоге и нажмите 'Заказать'")
-
-    elif text == '🌹 Букет 1':
-        await update.message.reply_photo(
-            photo="https://floraservis.ru/upload/iblock/0d3/nkr6256qhf6b79bdh86ezgl9kufycbei.jpeg",
-            caption="🌹 Букет 1 — 18230₽\n❌ Нет в наличии"
-        )
-
-    elif text == '🌷 Букет 2':
-        count = availability["2"]
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Заказать 🌷", callback_data="order_2")]
-        ])
-        await update.message.reply_photo(
-            photo="https://floraservis.ru/upload/iblock/0fc/abo9003vbqn2fusdjosgknhsxwczpq7j.jpeg",
-            caption=f"🌷 Букет 2 — 18230₽\nВ наличии: {count} шт.",
-            reply_markup=keyboard
-        )
-
-    elif text == '🌻 Букет 3':
-        count = availability["3"]
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Заказать 🌻", callback_data="order_3")]
-        ])
-        await update.message.reply_photo(
-            photo="https://floraservis.ru/upload/iblock/e25/f2bvr479poaj4h1qp9fx6o41slldkwqt.jpg",
-            caption=f"🌻 Букет 3 — 32600₽\nВ наличии: {count} шт.",
-            reply_markup=keyboard
-        )
-
     else:
-        await update.message.reply_text("Я пока не понимаю эту команду 😊")
+        if chat_id in user_state and user_state[chat_id]["step"] == "get_name_phone":
+            user_state[chat_id]["contact"] = text
+            await update.message.reply_text(
+                f"Спасибо за заказ!\n\n"
+                f"Букет: {user_state[chat_id]['bouquet']}\n"
+                f"Дата: {user_state[chat_id]['date']}\n"
+                f"Время: {user_state[chat_id]['time']}\n"
+                f"Контакты: {text}"
+            )
+            # Обновляем остатки
+            b_id = user_state[chat_id]["bouquet_id"]
+            if b_id in stock and stock[b_id] > 0:
+                stock[b_id] -= 1
+            del user_state[chat_id]
+        else:
+            await update.message.reply_text("Я пока не понимаю эту команду 😊")
 
-# Обработка кнопок "Заказать"
+# Обработка inline-кнопок
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    chat_id = query.message.chat_id
 
-    user_id = query.from_user.id
-    action = query.data
+    bouquet_id = query.data.split("_")[1]
+    if stock[bouquet_id] == 0:
+        await query.message.reply_text("❌ Этот букет временно недоступен.")
+        return
 
-    if action.startswith("order_"):
-        bouquet_id = action.split("_")[1]
+    bouquet_names = {"2": "🌷 Букет 2", "3": "🌻 Букет 3"}
+    user_state[chat_id] = {
+        "step": "choose_date",
+        "bouquet": bouquet_names[bouquet_id],
+        "bouquet_id": bouquet_id
+    }
 
-        if availability[bouquet_id] == 0:
-            await query.message.reply_text("❌ К сожалению, этого букета нет в наличии.")
-            return
+    buttons = [[InlineKeyboardButton(date, callback_data=f"date_{date}")] for date in get_delivery_dates()]
+    markup = InlineKeyboardMarkup(buttons)
+    await query.message.reply_text(
+        f"Вы выбрали {bouquet_names[bouquet_id]}.\nВыберите дату доставки:",
+        reply_markup=markup
+    )
 
-        # Сохраняем выбор
-        names = {"1": "🌹 Букет 1", "2": "🌷 Букет 2", "3": "🌻 Букет 3"}
-        user_data[user_id] = {
-            "bouquet_id": bouquet_id,
-            "bouquet": names[bouquet_id],
-        }
+# Обработка выбора даты и времени
+async def handle_next_steps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat_id = query.message.chat_id
+    data = query.data
 
-        # Кнопки с датами
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(date, callback_data=f"date_{date}")] for date in date_options
-        ])
-        await query.message.reply_text("Выберите дату доставки:", reply_markup=keyboard)
+    if chat_id not in user_state:
+        await query.message.reply_text("Пожалуйста, начните заказ заново.")
+        return
 
-    elif action.startswith("date_"):
-        date = action.split("date_")[1]
-        user_data[user_id]["date"] = date
+    if data.startswith("date_"):
+        chosen_date = data.split("_")[1]
+        user_state[chat_id]["date"] = chosen_date
+        user_state[chat_id]["step"] = "choose_time"
 
-        # Кнопки с временем
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(t, callback_data=f"time_{t}")] for t in time_slots
-        ])
-        await query.message.reply_text("Выберите удобное время:", reply_markup=keyboard)
+        buttons = [[InlineKeyboardButton(t, callback_data=f"time_{t}")] for t in time_slots]
+        await query.message.reply_text("Выберите время доставки:", reply_markup=InlineKeyboardMarkup(buttons))
 
-    elif action.startswith("time_"):
-        time = action.split("time_")[1]
-        user_data[user_id]["time"] = time
-        user_data[user_id]["waiting_for"] = "name_phone"
+    elif data.startswith("time_"):
+        chosen_time = data.split("_")[1]
+        user_state[chat_id]["time"] = chosen_time
+        user_state[chat_id]["step"] = "get_name_phone"
+        await query.message.reply_text("Пожалуйста, введите ваше имя и номер телефона:")
 
-        await query.message.reply_text("Пожалуйста, отправьте ваше имя и номер телефона:")
-
-# Обработка ошибок
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logging.error("Exception while handling an update:", exc_info=context.error)
-    if update and hasattr(update, "message") and update.message:
-        await update.message.reply_text("Произошла ошибка. Мы уже разбираемся!")
-
-# Запуск приложения
+# Запуск
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(handle_callback))
+app.add_handler(CallbackQueryHandler(handle_next_steps, pattern="^(date_|time_)"))
+app.add_handler(CallbackQueryHandler(handle_callback, pattern="^order_"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-app.add_error_handler(error_handler)
-
 app.run_polling()
