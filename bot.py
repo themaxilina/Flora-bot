@@ -7,7 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 logging.basicConfig(level=logging.INFO)
 
 # Вставь сюда свой токен
-TOKEN = "7973085918:AAGgI8K0wMWVKspRad0y53EKbirCCjijqXE"
+TOKEN = os.environ.get("BOT_TOKEN")
 
 # Главное меню
 main_menu = ReplyKeyboardMarkup(
