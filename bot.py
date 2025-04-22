@@ -1,11 +1,12 @@
 
 import logging
+import os
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 logging.basicConfig(level=logging.INFO)
 
-TOKEN = 7973085918:AAGgI8K0wMWVKspRad0y53EKbirCCjijqXE
+TOKEN = os.getenv("TOKEN")
 
 menu_keyboard = ReplyKeyboardMarkup(
     [['💐 Каталог', '🛍 Заказать'], ['📞 Контакты']],
