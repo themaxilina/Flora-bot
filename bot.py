@@ -6,7 +6,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 
 logging.basicConfig(level=logging.INFO)
 
-# Вставь сюда свой токен
 TOKEN = os.environ.get("BOT_TOKEN")
 
 # Главное меню
@@ -21,16 +20,30 @@ catalog_menu = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# Старт
+# Хранилище для отслеживания состояния пользователя
+user_states = {}  # user_id: { 'stage': 'waiting_for_contact', 'bouquet': '🌹 Букет 1' }
+
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Добро пожаловать в Flora Пермь! Выберите действие:",
         reply_markup=main_menu
     )
 
-# Обработка команд
+# Обработка обычных сообщений
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    user_id = update.message.from_user.id
+
+    # Проверка: если пользователь в режиме ожидания данных
+    if user_id in user_states and user_states[user_id]['stage'] == 'waiting_for_contact':
+        bouquet = user_states[user_id]['bouquet']
+        await update.message.reply_text(
+            f"Спасибо за заказ на {bouquet}!\nВаши данные: {text}\nСкоро с вами свяжемся! 💐"
+        )
+        del user_states[user_id]
+        return
+
     if text == '💐 Каталог':
         await update.message.reply_text("Выберите букет:", reply_markup=catalog_menu)
 
@@ -62,7 +75,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Вы вернулись в главное меню", reply_markup=main_menu)
 
     elif text == '🛍 Заказать':
-        await update.message.reply_text("Для заказа напишите: имя и номер телефона")
+        await update.message.reply_text("Для заказа выберите букет из каталога")
 
     elif text == '📞 Контакты':
         await update.message.reply_text(
@@ -77,12 +90,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    bouquet = query.data.split("_")[1]
+    bouquet_id = query.data.split("_")[1]
     names = {"1": "🌹 Букет 1", "2": "🌷 Букет 2", "3": "🌻 Букет 3"}
-    name = names.get(bouquet, "Букет")
+    bouquet_name = names.get(bouquet_id, "Букет")
+
+    user_id = query.from_user.id
+    user_states[user_id] = {
+        'stage': 'waiting_for_contact',
+        'bouquet': bouquet_name
+    }
 
     await query.message.reply_text(
-        f"Вы выбрали {name}. Пожалуйста, отправьте ваше имя и номер телефона для оформления заказа:"
+        f"Вы выбрали {bouquet_name}. Пожалуйста, отправьте ваше имя и номер телефона для оформления заказа:"
     )
 
 # Запуск бота
