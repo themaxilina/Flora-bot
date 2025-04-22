@@ -18,24 +18,21 @@ catalog_menu = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# Остатки букетов
+# Наличие букетов
 stock = {
     "1": 0,  # нет в наличии
-    "2": 5,
+    "2": 3,
     "3": 3
 }
 
-# Временное хранилище для состояний пользователей
+# Состояния пользователей
 user_state = {}
 
-# Старт
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Добро пожаловать в Flora Пермь! Выберите действие:",
-        reply_markup=main_menu
-    )
+    await update.message.reply_text("Добро пожаловать в Flora Пермь! Выберите действие:", reply_markup=main_menu)
 
-# Обработка каталога
+# Обработка текстовых сообщений
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.message.from_user.id
@@ -77,11 +74,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Вы вернулись в главное меню", reply_markup=main_menu)
 
     elif text == '📞 Контакты':
-        await update.message.reply_text(
-            "📍 Пермь, Карпинского 91д\n📞 +7 (342) 214-88-99\n⏰ 9:00–21:00"
-        )
+        await update.message.reply_text("📍 Пермь, Карпинского 91д\n📞 +7 (342) 214-88-99\n⏰ 9:00–21:00")
 
-# Обработка кнопки "Заказать"
+# Шаг 1: выбор букета
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -90,15 +85,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bouquet_id = query.data.split("_")[1]
     user_state[user_id] = {"bouquet_id": bouquet_id}
 
-    # Шаг 1 — выбор даты
+    # Спрашиваем дату
     date_keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Сегодня", callback_data="date_today")],
         [InlineKeyboardButton("Завтра", callback_data="date_tomorrow")],
         [InlineKeyboardButton("Послезавтра", callback_data="date_after")]
     ])
-    await query.message.reply_text("Выберите дату доставки:", reply_markup=date_keyboard)
+    await query.message.reply_text("Вы выбрали букет №" + bouquet_id + ".\nТеперь выберите дату доставки:", reply_markup=date_keyboard)
 
-# Обработка выбора даты и времени
+# Шаг 2: выбор даты и времени
 async def handle_date_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -109,7 +104,6 @@ async def handle_date_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         date_choice = data.split("_")[1]
         user_state[user_id]["date"] = date_choice
 
-        # Шаг 2 — выбор времени
         time_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("09:00–12:00", callback_data="time_morning")],
             [InlineKeyboardButton("12:00–15:00", callback_data="time_day")],
@@ -120,11 +114,9 @@ async def handle_date_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("time_"):
         time_choice = data.split("_")[1]
         user_state[user_id]["time"] = time_choice
+        await query.message.reply_text("Теперь введите ваше имя и номер телефона (например: Анна, +79001234567)")
 
-        # Шаг 3 — запрос имени и телефона
-        await query.message.reply_text("Введите ваше имя и номер телефона (например: Анна, +79001234567)")
-
-# Обработка текста: имя и телефон
+# Шаг 3: получение имени и телефона
 async def collect_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     text = update.message.text
@@ -133,31 +125,32 @@ async def collect_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_state[user_id]["contact"] = text
 
         info = user_state[user_id]
+        bouquet_names = {"1": "🌹 Букет 1", "2": "🌷 Букет 2", "3": "🌻 Букет 3"}
+        time_names = {"morning": "09:00–12:00", "day": "12:00–15:00", "evening": "15:00–18:00"}
+        date_names = {"today": "Сегодня", "tomorrow": "Завтра", "after": "Послезавтра"}
+
         await update.message.reply_text(
             f"Спасибо за заказ!\n\n"
-            f"Букет №{info['bouquet_id']}\n"
-            f"Дата: {info['date']}\n"
-            f"Время: {info['time']}\n"
-            f"Контакт: {info['contact']}"
+            f"{bouquet_names.get(info['bouquet_id'])}\n"
+            f"Дата: {date_names.get(info['date'])}\n"
+            f"Время: {time_names.get(info['time'])}\n"
+            f"Контакты: {info['contact']}"
         )
 
-        # Уменьшаем количество
-        bouquet_id = info['bouquet_id']
-        if bouquet_id in stock and stock[bouquet_id] > 0:
-            stock[bouquet_id] -= 1
+        if stock[info['bouquet_id']] > 0:
+            stock[info['bouquet_id']] -= 1
 
-        # Удалим данные пользователя после заказа
         del user_state[user_id]
 
     else:
-        await update.message.reply_text("Я пока не понимаю эту команду. Попробуйте начать заказ сначала.")
+        await update.message.reply_text("Пожалуйста, выберите букет и оформите заказ заново.")
 
-# Инициализация
+# Бот запускается
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(handle_callback, pattern="order_"))
 app.add_handler(CallbackQueryHandler(handle_date_time, pattern="date_.*|time_.*"))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, collect_user_info))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 app.run_polling()
