@@ -21,7 +21,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if text == '💐 Каталог':
-        await update.message.reply_text("Вот наш каталог:
+        await update.message.reply_text("Вот наш каталог:")
 🌹 Букет 1
 🌷 Букет 2
 🌻 Букет 3")
