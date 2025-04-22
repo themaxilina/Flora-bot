@@ -5,7 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 
 logging.basicConfig(level=logging.INFO)
 
-TOKEN = "YOUR_BOT_TOKEN_HERE"
+TOKEN = 7973085918:AAGgI8K0wMWVKspRad0y53EKbirCCjijqXE
 
 menu_keyboard = ReplyKeyboardMarkup(
     [['💐 Каталог', '🛍 Заказать'], ['📞 Контакты']],
