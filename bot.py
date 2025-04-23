@@ -81,7 +81,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bouquet_info(update, "2", "🌷 Букет 2", "https://floraservis.ru/upload/iblock/0fc/abo9003vbqn2fusdjosgknhsxwczpq7j.jpeg")
 
     elif text.startswith('🌻 Букет 3'):
-        await send_bouquet_info(update, "3", "🌻 Букет 3", https://floraservis.ru/upload/iblock/e25/f2bvr479poaj4h1qp9fx6o41slldkwqt.jpg)    elif text == '⬅️ Назад':
+        await send_bouquet_info(update, "3", "🌻 Букет 3", https://floraservis.ru/upload/iblock/e25/f2bvr479poaj4h1qp9fx6o41slldkwqt.jpg)   
+    elif text == '⬅️ Назад':
         await update.message.reply_text("Вы вернулись в главное меню", reply_markup=main_menu)
 
     elif text == '🛍 Заказать':
